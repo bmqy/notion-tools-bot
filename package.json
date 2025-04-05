@@ -1,0 +1,36 @@
+{
+  "name": "notion-tools-bot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "npm run generate-config && wrangler deploy",
+    "start:local": "wrangler dev --local src/worker.ts",
+    "build": "npm run generate-config && tsc",
+    "generate-config": "node scripts/generate-wrangler-config.js",
+    "lint": "eslint src --ext .ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Notion 工具人 - 监听 Notion 数据库更新并触发 GitHub Actions",
+  "main": "src/worker.ts",
+  "type": "module",
+  "dependencies": {
+    "@notionhq/client": "^2.2.14",
+    "grammy": "^1.21.1",
+    "octokit": "^3.1.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240208.0",
+    "@types/node": "^20.11.19",
+    "@types/node-telegram-bot-api": "^0.64.2",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "dotenv": "^16.4.7",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.28.1"
+  }
+}
