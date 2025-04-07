@@ -41,4 +41,7 @@ export interface Env {
   // Notion 配置
   NOTION_TOKEN: string;
   NOTION_TOOLS_BOT: KVNamespace;
+  
+  // 触发延迟配置
+  TRIGGER_DELAY_MINUTES?: string; // 延迟触发时间（分钟），默认为 5 分钟
 } 

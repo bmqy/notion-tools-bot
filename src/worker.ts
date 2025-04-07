@@ -1,6 +1,13 @@
+import { Bot } from 'grammy';
+import { triggerGitHubAction } from './github/actions';
+import { getAllNotionDatabasesFromKV } from './models/notionDatabase';
+import { canTriggerActions, clearTriggerStatus, getTriggerStatus } from './models/triggerStatus';
 import { handleNotionWebhook } from './notion/webhook';
 import { handleTelegramWebhook, setupTelegramWebhook } from './telegram/webhook';
 import type { Env } from './types';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('Worker');
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -659,6 +666,80 @@ export default {
             'Content-Type': 'text/html;charset=UTF-8'
           }
         });
+    }
+  },
+
+  /**
+   * 定时任务，检查并触发延迟的操作
+   */
+  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
+    logger.info('开始执行定时任务：检查延迟触发');
+    
+    try {
+      // 获取所有 Notion 数据库
+      const databases = await getAllNotionDatabasesFromKV(env.NOTION_TOOLS_BOT);
+      logger.info(`找到 ${databases.length} 个数据库配置`);
+      
+      // 检查每个数据库的触发状态
+      for (const database of databases) {
+        if (!database.githubRepoId) {
+          logger.debug(`跳过未绑定 GitHub 仓库的数据库: ${database.id}`);
+          continue;
+        }
+        
+        const databaseId = database.id.replace(/-/g, '');
+        
+        // 检查是否可以触发操作
+        if (await canTriggerActions(env.NOTION_TOOLS_BOT, databaseId)) {
+          logger.info(`数据库 ${databaseId} 可以触发操作`);
+          
+          // 获取触发状态以确认是否是延迟触发
+          const status = await getTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
+          if (status && status.pending) {
+            const [owner, repo] = database.githubRepoId.split('/') as [string, string];
+            if (!owner || !repo) {
+              logger.error(`GitHub 仓库 ID 格式错误: ${database.githubRepoId}`);
+              continue;
+            }
+            
+            if (!env.GITHUB_TOKEN) {
+              logger.error('未配置 GitHub Token');
+              continue;
+            }
+            
+            logger.info(`触发 GitHub Action: ${owner}/${repo} (延迟触发)`);
+            try {
+              await triggerGitHubAction(env.GITHUB_TOKEN, owner, repo);
+              await clearTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
+              
+              // 发送 Telegram 通知（如果配置了）
+              if (env.TELEGRAM_ADMIN_USER_ID && env.TELEGRAM_BOT_TOKEN) {
+                const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
+                await bot.init();
+                
+                const message = `⏰ <b>延迟触发通知</b>\n\n` +
+                  `数据库：${database.name || database.id}\n` +
+                  `ID：${database.id}\n` +
+                  `关联仓库：${database.githubRepoId}\n` +
+                  `触发时间：${new Date().toLocaleString()}\n\n` +
+                  `✅ 已完成延迟触发 GitHub Action`;
+                
+                await bot.api.sendMessage(env.TELEGRAM_ADMIN_USER_ID, message, {
+                  parse_mode: 'HTML'
+                });
+              }
+              
+              logger.info(`成功触发 GitHub Action: ${owner}/${repo}`);
+            } catch (error) {
+              logger.error(`触发 GitHub Action 失败: ${owner}/${repo}`, error);
+            }
+          }
+        }
+      }
+      
+      logger.info('定时任务完成');
+    } catch (error) {
+      logger.error('定时任务执行失败', error);
     }
   }
 }; 

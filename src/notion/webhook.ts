@@ -1,6 +1,7 @@
 import { Bot } from 'grammy';
 import { triggerGitHubAction } from '../github/actions';
 import { getAllNotionDatabasesFromKV } from '../models/notionDatabase';
+import { canTriggerActions, clearTriggerStatus, updateTriggerStatus } from '../models/triggerStatus';
 import type { Env } from '../types';
 import { createLogger } from '../utils/logger';
 
@@ -113,18 +114,39 @@ async function handleDatabaseUpdate(body: NotionWebhookBody, env: Env): Promise<
     return new Response('未配置 GitHub Token', { status: 500 });
   }
 
-  await triggerGitHubAction(env.GITHUB_TOKEN, owner, repo);
-
-  const message = `📝 <b>Notion 数据库更新通知</b>\n\n` +
-    `数据库：${updatedDatabase.title}\n` +
-    `ID：${updatedDatabase.id}\n` +
-    `关联仓库：${updatedDatabase.githubRepoId}\n` +
-    `更新时间：${new Date(updatedDatabase.updatedAt).toLocaleString()}\n\n` +
-    `✅ 已触发 GitHub Action 同步`;
+  // 获取延迟时间（分钟），默认为5分钟
+  const delayMinutes = parseInt(env.TRIGGER_DELAY_MINUTES || '5', 10);
   
-  await sendTelegramMessage(env, message);
+  // 更新触发状态，设置延迟时间
+  await updateTriggerStatus(env.NOTION_TOOLS_BOT, databaseId, delayMinutes);
+  
+  // 检查是否应该立即触发，通常情况下这里会返回false，因为我们刚刚设置了触发状态
+  // 仅作为安全检查，防止状态设置失败
+  if (await canTriggerActions(env.NOTION_TOOLS_BOT, databaseId)) {
+    logger.info(`立即触发 GitHub Action: ${owner}/${repo}`);
+    await triggerGitHubAction(env.GITHUB_TOKEN, owner, repo);
+    await clearTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
+    
+    const message = `📝 <b>Notion 数据库更新通知</b>\n\n` +
+      `数据库：${updatedDatabase.name || updatedDatabase.id}\n` +
+      `ID：${updatedDatabase.id}\n` +
+      `关联仓库：${updatedDatabase.githubRepoId}\n` +
+      `更新时间：${new Date().toLocaleString()}\n\n` +
+      `✅ 已立即触发 GitHub Action 同步`;
+    
+    await sendTelegramMessage(env, message);
+  } else {
+    const message = `📝 <b>Notion 数据库更新通知</b>\n\n` +
+      `数据库：${updatedDatabase.name || updatedDatabase.id}\n` +
+      `ID：${updatedDatabase.id}\n` +
+      `关联仓库：${updatedDatabase.githubRepoId}\n` +
+      `更新时间：${new Date().toLocaleString()}\n\n` +
+      `⏳ 已设置延迟触发，将在 ${delayMinutes} 分钟后触发 GitHub Action（如无新通知）`;
+    
+    await sendTelegramMessage(env, message);
+  }
 
-  logger.info('成功触发 GitHub Action');
+  logger.info(`成功处理 Notion 更新事件，设置了 ${delayMinutes} 分钟延迟触发`);
   return new Response('已接收', { 
     status: 200,
     headers: {

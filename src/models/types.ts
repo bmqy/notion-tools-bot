@@ -28,6 +28,7 @@ export const KV_PREFIXES = {
   GITHUB_REPO: 'github_repo:',
   NOTION_DB_LIST: 'notion_db_list',
   GITHUB_REPO_LIST: 'github_repo_list',
+  TRIGGER_STATUS: 'trigger_status:', // 触发状态前缀
 } as const;
 
 // 导出 Cloudflare Workers 的类型
