@@ -78,7 +78,7 @@ TELEGRAM_ADMIN_USER_ID=your_telegram_user_id
 # GitHub 配置
 GITHUB_TOKEN=your_github_personal_access_token
 
-# 延时触发actions，单位：分钟
+# 延时触发actions
 TRIGGER_DELAY_MINUTES=5
 ```
 
