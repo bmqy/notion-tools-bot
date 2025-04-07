@@ -96,22 +96,9 @@ export async function clearTriggerStatus(
   const key = `${TRIGGER_STATUS_PREFIX}${databaseId}`;
   
   try {
-    // 获取当前状态
-    const currentStatus = await getTriggerStatus(kv, databaseId);
-    
-    if (currentStatus) {
-      // 更新状态为非pending
-      const status: TriggerStatus = {
-        ...currentStatus,
-        pending: false
-      };
-      await kv.put(key, JSON.stringify(status));
-      logger.info(`更新触发状态为非 pending: ${databaseId}`);
-    } else {
-      // 如果不存在状态，直接删除
-      await kv.delete(key);
-      logger.info(`清除触发状态成功: ${databaseId}`);
-    }
+    // 直接删除状态
+    await kv.delete(key);
+    logger.info(`清除触发状态成功: ${databaseId}`);
   } catch (error) {
     logger.error(`清除触发状态失败: ${databaseId}`, error);
     throw error;
@@ -130,9 +117,9 @@ export async function canTriggerActions(
 ): Promise<boolean> {
   const status = await getTriggerStatus(kv, databaseId);
   
-  // 如果没有状态或者状态不是pending，可以立即触发
-  if (!status || !status.pending) {
-    logger.info(`可以立即触发动作: ${databaseId}, 未设置触发状态或非pending状态`);
+  // 如果没有状态，可以立即触发
+  if (!status) {
+    logger.info(`可以立即触发动作: ${databaseId}, 未设置触发状态`);
     return true;
   }
   

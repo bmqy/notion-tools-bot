@@ -11,6 +11,10 @@ const baseConfig = {
   main: "src/worker.ts",
   compatibility_date: "2024-03-31",
   compatibility_flags: ["nodejs_compat"],
+  // 添加触发器配置
+  triggers: {
+    crons: ["* * * * *"] // 每分钟执行一次
+  }
 };
 
 // 从环境变量获取 KV 配置
@@ -36,8 +40,8 @@ function generateTomlString(config) {
   
   // 处理基础配置
   for (const [key, value] of Object.entries(config)) {
-    // 跳过 kv_namespaces，后面单独处理
-    if (key === 'kv_namespaces') continue;
+    // 跳过 kv_namespaces 和 triggers，后面单独处理
+    if (key === 'kv_namespaces' || key === 'triggers') continue;
     
     if (Array.isArray(value)) {
       tomlContent += `${key} = [${value.map(v => `"${v}"`).join(', ')}]\n`;
@@ -59,6 +63,17 @@ function generateTomlString(config) {
         tomlContent += `${key} = "${value}"\n`;
       }
     });
+  }
+  
+  // 处理触发器配置
+  if (config.triggers) {
+    tomlContent += '\n# 定时任务配置\n';
+    tomlContent += '[triggers]\n';
+    
+    // 处理 crons 数组
+    if (config.triggers.crons && config.triggers.crons.length > 0) {
+      tomlContent += `crons = [${config.triggers.crons.map(cron => `"${cron}"`).join(', ')}]\n`;
+    }
   }
   
   return tomlContent;

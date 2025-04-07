@@ -688,52 +688,60 @@ export default {
         }
         
         const databaseId = database.id.replace(/-/g, '');
+        logger.info(`检查数据库 ${databaseId} 的触发状态...`);
+        
+        // 获取当前触发状态进行日志记录
+        const currentStatus = await getTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
+        if (currentStatus) {
+          logger.info(`数据库 ${databaseId} 的触发状态: pending=${currentStatus.pending}, nextTriggerTime=${new Date(currentStatus.nextTriggerTime).toLocaleString()}, 当前时间=${new Date().toLocaleString()}`);
+        } else {
+          logger.info(`数据库 ${databaseId} 没有触发状态记录`);
+        }
         
         // 检查是否可以触发操作
         if (await canTriggerActions(env.NOTION_TOOLS_BOT, databaseId)) {
           logger.info(`数据库 ${databaseId} 可以触发操作`);
           
-          // 获取触发状态以确认是否是延迟触发
-          const status = await getTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
-          if (status && status.pending) {
-            const [owner, repo] = database.githubRepoId.split('/') as [string, string];
-            if (!owner || !repo) {
-              logger.error(`GitHub 仓库 ID 格式错误: ${database.githubRepoId}`);
-              continue;
-            }
-            
-            if (!env.GITHUB_TOKEN) {
-              logger.error('未配置 GitHub Token');
-              continue;
-            }
-            
-            logger.info(`触发 GitHub Action: ${owner}/${repo} (延迟触发)`);
-            try {
-              await triggerGitHubAction(env.GITHUB_TOKEN, owner, repo);
-              await clearTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
-              
-              // 发送 Telegram 通知（如果配置了）
-              if (env.TELEGRAM_ADMIN_USER_ID && env.TELEGRAM_BOT_TOKEN) {
-                const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
-                await bot.init();
-                
-                const message = `⏰ <b>延迟触发通知</b>\n\n` +
-                  `数据库：${database.name || database.id}\n` +
-                  `ID：${database.id}\n` +
-                  `关联仓库：${database.githubRepoId}\n` +
-                  `触发时间：${new Date().toLocaleString()}\n\n` +
-                  `✅ 已完成延迟触发 GitHub Action`;
-                
-                await bot.api.sendMessage(env.TELEGRAM_ADMIN_USER_ID, message, {
-                  parse_mode: 'HTML'
-                });
-              }
-              
-              logger.info(`成功触发 GitHub Action: ${owner}/${repo}`);
-            } catch (error) {
-              logger.error(`触发 GitHub Action 失败: ${owner}/${repo}`, error);
-            }
+          // 只要可以触发，就执行触发逻辑
+          const [owner, repo] = database.githubRepoId.split('/') as [string, string];
+          if (!owner || !repo) {
+            logger.error(`GitHub 仓库 ID 格式错误: ${database.githubRepoId}`);
+            continue;
           }
+          
+          if (!env.GITHUB_TOKEN) {
+            logger.error('未配置 GitHub Token');
+            continue;
+          }
+          
+          logger.info(`触发 GitHub Action: ${owner}/${repo} (延迟触发)`);
+          try {
+            await triggerGitHubAction(env.GITHUB_TOKEN, owner, repo);
+            await clearTriggerStatus(env.NOTION_TOOLS_BOT, databaseId);
+            
+            // 发送 Telegram 通知（如果配置了）
+            if (env.TELEGRAM_ADMIN_USER_ID && env.TELEGRAM_BOT_TOKEN) {
+              const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
+              await bot.init();
+              
+              const message = `⏰ <b>延迟触发通知</b>\n\n` +
+                `数据库：${database.name || database.id}\n` +
+                `ID：${database.id}\n` +
+                `关联仓库：${database.githubRepoId}\n` +
+                `触发时间：${new Date().toLocaleString()}\n\n` +
+                `✅ 已完成延迟触发 GitHub Action`;
+              
+              await bot.api.sendMessage(env.TELEGRAM_ADMIN_USER_ID, message, {
+                parse_mode: 'HTML'
+              });
+            }
+            
+            logger.info(`成功触发 GitHub Action: ${owner}/${repo}`);
+          } catch (error) {
+            logger.error(`触发 GitHub Action 失败: ${owner}/${repo}`, error);
+          }
+        } else {
+          logger.info(`数据库 ${databaseId} 不能触发操作，可能等待时间未到或已触发`);
         }
       }
       
