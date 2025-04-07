@@ -11,6 +11,7 @@
 - 📝 `Notion`数据库更新时自动触发`GitHub Actions`工作流
 - 📝 指令式触发`Notion`数据库绑定仓库的`GitHub Actions`工作流
 - 🔔 实时接收工作流执行状态消息
+- ⏰ 延时触发，避免频繁触发`GitHub Actions`
 
 ## 准备工作
 
@@ -76,6 +77,9 @@ TELEGRAM_ADMIN_USER_ID=your_telegram_user_id
 
 # GitHub 配置
 GITHUB_TOKEN=your_github_personal_access_token
+
+# 延时触发actions
+TRIGGER_DELAY_MINUTES=5
 ```
 
 ### 获取 KV 命名空间id
