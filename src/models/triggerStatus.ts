@@ -117,22 +117,21 @@ export async function canTriggerActions(
 ): Promise<boolean> {
   const status = await getTriggerStatus(kv, databaseId);
   
-  // 如果没有状态，可以立即触发
+  // 如果没有状态记录，说明不需要触发
   if (!status) {
-    logger.info(`可以立即触发动作: ${databaseId}, 未设置触发状态`);
-    return true;
+    logger.info(`数据库 ${databaseId} 没有触发状态记录，不需要触发`);
+    return false;
   }
   
   const now = Date.now();
   const nextTriggerTime = status.nextTriggerTime;
   
-  // 如果当前时间已经超过了下次触发时间，可以触发
-  if (now >= nextTriggerTime) {
-    logger.info(`可以触发动作: ${databaseId}, 当前时间: ${new Date(now).toLocaleString()}, 已超过触发时间: ${new Date(nextTriggerTime).toLocaleString()}`);
+  // 只有在状态为 pending 且当前时间超过触发时间时才能触发
+  if (status.pending && now >= nextTriggerTime) {
+    logger.info(`数据库 ${databaseId} 可以触发操作，当前时间: ${new Date(now).toLocaleString()}, 触发时间: ${new Date(nextTriggerTime).toLocaleString()}`);
     return true;
   }
   
-  // 否则，还不能触发
-  logger.info(`不能触发动作: ${databaseId}, 当前时间: ${new Date(now).toLocaleString()}, 触发时间: ${new Date(nextTriggerTime).toLocaleString()}`);
+  logger.info(`数据库 ${databaseId} 不能触发操作，状态: pending=${status.pending}, 当前时间: ${new Date(now).toLocaleString()}, 触发时间: ${new Date(nextTriggerTime).toLocaleString()}`);
   return false;
 } 
