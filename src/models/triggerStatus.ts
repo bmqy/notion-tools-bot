@@ -52,19 +52,15 @@ export async function updateTriggerStatus(
   const now = Date.now();
   
   try {
-    // 获取当前的触发状态
+    // 获取当前的触发状态（仅用于日志记录）
     const currentStatus = await getTriggerStatus(kv, databaseId);
     
-    let nextTriggerTime: number;
+    // 总是从当前时间开始计算新的触发时间
+    const nextTriggerTime = now + (delayMinutes * 60 * 1000);
     
-    // 如果已经存在触发状态且处于pending状态，则从当前的nextTriggerTime开始计算新的延迟
-    if (currentStatus && currentStatus.pending) {
-      // 从当前的预定触发时间计算新的触发时间
-      nextTriggerTime = currentStatus.nextTriggerTime + (delayMinutes * 60 * 1000);
+    if (currentStatus) {
       logger.info(`更新延迟触发时间: ${databaseId}, 原触发时间: ${new Date(currentStatus.nextTriggerTime).toLocaleString()}, 新触发时间: ${new Date(nextTriggerTime).toLocaleString()}, 延迟了${delayMinutes}分钟`);
     } else {
-      // 首次触发，从当前时间开始计算
-      nextTriggerTime = now + (delayMinutes * 60 * 1000);
       logger.info(`设置初始触发时间: ${databaseId}, 触发时间: ${new Date(nextTriggerTime).toLocaleString()}, 延迟了${delayMinutes}分钟`);
     }
     
