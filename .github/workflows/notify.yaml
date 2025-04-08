@@ -13,7 +13,7 @@ jobs:
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
             #Github #Notion工具人bot #发布更新
-            
+
             发布人：${{ github.actor }}
             提交消息: ${{ github.event.commits[0].message }}
             提交项目: ${{ github.repository }}
